@@ -1,0 +1,91 @@
+# Shared settings of the CR-CDANet experiments.
+# Task files (configs/*2*.yaml) override the `task` block and may override any
+# other entry.
+
+seed: 42
+device: cuda:0
+
+data:
+  root: datasets          # directory holding <dataset>/<files>
+  output_root: outputs    # checkpoints, translated images and change maps
+  patch_size: 17          # side of the patch used by the change detector
+  diffusion_patch_size: 16
+
+# Description of the released datasets.  Each scene provides the SAR image of
+# one date and the RGB image of the other; the change map holds 0 = unchanged
+# and 1 = changed, and the images are scaled to [0, 1].
+datasets:
+  shuguang:
+    loader: image
+    scale: 0.00392156862745098      # 1 / 255
+    gt_encoding: binary
+    rgb: {file: shuguang_2.bmp}
+    sar: {file: shuguang_1.bmp}
+    gt:  {file: shuguang_gt.bmp}
+  islandtown:
+    loader: image
+    scale: 0.00392156862745098
+    gt_encoding: binary
+    rgb: {file: Img11-Ac.ppm}
+    sar: {file: Img11-B.ppm}
+    gt:  {file: Img11-C.ppm}
+
+# ---------------------------------------------------------------------------
+# DADiff: cross-modal conditional diffusion
+# ---------------------------------------------------------------------------
+dadiff:
+  timesteps: 2000            # total diffusion steps T
+  linear_start: 1.0e-4       # linear noise schedule
+  linear_end: 2.0e-2
+  sample_steps: 100          # denoising iterations used at inference time
+  loss_type: l2
+  lr: 1.0e-4
+  batch_size: 256
+  num_workers: 4
+  num_samples: 20000         # crops sampled per epoch
+  train_split: 0.9999
+  epochs:
+    pretrain: 200            # source domain
+    adapt: [100, 50, 50, 50, 50]   # target domain, per refinement round
+  alphas: [0.3, 0.5, 0.7]    # MMD weight per encoder scale, shallow to deep
+
+# ---------------------------------------------------------------------------
+# DCCD: domain adaptation and co-training based change detection
+# ---------------------------------------------------------------------------
+cd:
+  epochs: 100
+  batch_size: 128
+  eval_batch_size: 256
+  num_workers: 4
+  lr: 1.0e-4
+  weight_decay: 5.0e-4
+  patch_size: 17
+  depths: [2, 2, 2]
+  depths_decoder: [2, 2, 2]
+  fusion_decoder: [128, 64, 32]
+  attn_drop_rate: 0.2
+  drop_path_rate: 0.2
+  alphas: [0.3, 0.5, 0.7]
+  source_label_ratio: 1.0    # fully supervised source domain (Sec. III-C)
+  target_label_ratios: [0.01, 0.05, 0.10, 0.15, 0.20]
+  # Weight of the supervised loss and of the alignment loss, by epoch.
+  loss_schedule:
+    - {until_epoch: 30, main_weight: 0.25, alignment_weight: 0.75}
+    - {until_epoch: 50, main_weight: 0.50, alignment_weight: 0.50}
+    - {until_epoch: null, main_weight: 0.75, alignment_weight: 0.25}
+
+# ---------------------------------------------------------------------------
+# Cycle refinement: high-confidence pseudo-label selection
+# ---------------------------------------------------------------------------
+refinement:
+  tau1: 0.8        # agreement of the first expansion ring
+  tau2: 0.6        # agreement of the second expansion ring
+  tau_b: 0.8       # agreement of the boundary sub-regions
+  min_regions: 2   # number of boundary sub-regions that must agree
+
+# The `task` block is provided by each task file.
+task:
+  name: null
+  source: null
+  target: null
+  rounds: 5

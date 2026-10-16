@@ -1,0 +1,8 @@
+# Island Town -> Shuguang.
+# The source domain is Island Town (403 x 415), the target domain Shuguang
+# (593 x 921); both are SAR / RGB pairs.
+task:
+  name: islandtown2shuguang
+  source: islandtown
+  target: shuguang
+  rounds: 5
